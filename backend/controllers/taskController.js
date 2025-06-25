@@ -36,6 +36,7 @@ exports.createTask = async (req, res) => {
     dueDate,
     priority,
     status,
+    file: req.file?.filename || null,
     user: req.user._id
   });
 
@@ -56,4 +57,14 @@ exports.deleteTask = async (req, res) => {
   const task = await Task.findOneAndDelete({ _id: req.params.id, user: req.user._id });
   if (!task) return res.status(404).json({ message: 'Task not found' });
   res.json({ message: 'Task deleted' });
+};
+
+exports.toggleTaskStatus = async (req, res) => {
+  const task = await Task.findOne({ _id: req.params.id, user: req.user._id });
+  if (!task) return res.status(404).json({ message: 'Task not found' });
+
+  task.status = task.status === 'Complete' ? 'Pending' : 'Complete';
+  await task.save();
+
+  res.json(task);
 };

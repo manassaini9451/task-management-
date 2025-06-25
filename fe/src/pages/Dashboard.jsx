@@ -1,189 +1,225 @@
 import { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import {
-  fetchTasks, createTask, updateTask, deleteTask
-} from '../features/tasks/taskSlice';
-import {
-  Container, Typography, TextField, Button, MenuItem, Box, Stack,
-  Card, CardContent, IconButton, Dialog, DialogTitle, DialogContent,
-  DialogActions, Chip, InputAdornment
+  Container, Typography, TextField, Button, Card, CardContent,
+  MenuItem, Grid, Box, Stack, IconButton, Dialog, DialogTitle,
+  DialogContent, DialogActions
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import axios from 'axios';
+import { useSelector } from 'react-redux';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
+axios.defaults.baseURL = 'http://localhost:5000/api';
 
 export default function Dashboard() {
-  const dispatch = useDispatch();
-  const { tasks, total, loading } = useSelector((state) => state.tasks);
-
+  const { user } = useSelector((state) => state.auth);
+  const [tasks, setTasks] = useState([]);
   const [form, setForm] = useState({
-    title: '', description: '', dueDate: '', priority: 'Low', status: 'Pending'
+    title: '', description: '', priority: 'Low', status: 'Pending', dueDate: '', file: null
   });
-
-  const [editForm, setEditForm] = useState({
-    title: '', description: '', dueDate: '', priority: 'Low', status: 'Pending'
-  });
-
-  const [search, setSearch] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [filters, setFilters] = useState({ search: '', priority: '', status: '', page: 1 });
+  const [total, setTotal] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
-  const [editTaskId, setEditTaskId] = useState(null);
-  const [page, setPage] = useState(1);
-  const limit = 5;
+  const [editId, setEditId] = useState(null);
+
+  const tokenConfig = {
+    headers: { Authorization: `Bearer ${user?.token}` }
+  };
+
+  const fetchTasks = async () => {
+    try {
+      const res = await axios.get('/tasks', { ...tokenConfig, params: filters });
+      setTasks(res.data.tasks);
+      setTotal(res.data.total);
+    } catch (err) {
+      toast.error('Failed to load tasks');
+    }
+  };
 
   useEffect(() => {
-    dispatch(fetchTasks({ page, limit, search, priority: priorityFilter, status: statusFilter }));
-  }, [dispatch, page, search, priorityFilter, statusFilter]);
+    if (user?.token) fetchTasks();
+  }, [filters]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!form.title || !form.description) return;
-    await dispatch(createTask(form));
-    setForm({ title: '', description: '', dueDate: '', priority: 'Low', status: 'Pending' });
-    dispatch(fetchTasks({ page, limit, search, priority: priorityFilter, status: statusFilter }));
+    const data = new FormData();
+    data.append('title', form.title);
+    data.append('description', form.description);
+    data.append('dueDate', form.dueDate);
+    data.append('priority', form.priority);
+    data.append('status', form.status);
+    if (form.file) data.append('file', form.file);
+
+    try {
+      await axios.post('/tasks', data, {
+        headers: {
+          ...tokenConfig.headers,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      toast.success('Task created');
+      setForm({ title: '', description: '', priority: 'Low', status: 'Pending', dueDate: '', file: null });
+      fetchTasks();
+    } catch (err) {
+      toast.error('Create failed');
+    }
   };
 
-  const handleEditOpen = (task) => {
-    setEditTaskId(task._id);
-    setEditForm({
+  const handleDelete = async (id) => {
+    try {
+      await axios.delete(`/tasks/${id}`, tokenConfig);
+      toast.success('Task deleted');
+      fetchTasks();
+    } catch {
+      toast.error('Delete failed');
+    }
+  };
+
+  const handleEdit = (task) => {
+    setEditOpen(true);
+    setEditId(task._id);
+    setForm({
       title: task.title,
       description: task.description,
-      dueDate: task.dueDate?.split('T')[0] || '',
       priority: task.priority,
-      status: task.status
+      status: task.status,
+      dueDate: task.dueDate?.slice(0, 10) || '',
+      file: null
     });
-    setEditOpen(true);
   };
 
-  const handleEditSubmit = () => {
-    dispatch(updateTask({ id: editTaskId, data: editForm }));
-    setEditOpen(false);
-    setEditTaskId(null);
-    dispatch(fetchTasks({ page, limit, search, priority: priorityFilter, status: statusFilter }));
-  };
-
-  const getColor = (type, value) => {
-    if (type === 'priority') {
-      return value === 'High' ? 'error' : value === 'Medium' ? 'warning' : 'success';
+  const handleEditSubmit = async () => {
+    try {
+      await axios.put(`/tasks/${editId}`, form, tokenConfig);
+      toast.success('Task updated');
+      setEditOpen(false);
+      setForm({ title: '', description: '', priority: 'Low', status: 'Pending', dueDate: '', file: null });
+      fetchTasks();
+    } catch {
+      toast.error('Update failed');
     }
-    if (type === 'status') {
-      return value === 'Complete' ? 'primary' : 'default';
+  };
+
+  const handleToggleStatus = async (id) => {
+    try {
+      await axios.patch(`/tasks/${id}/status`, {}, tokenConfig);
+      fetchTasks();
+    } catch {
+      toast.error('Failed to toggle status');
     }
   };
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4 }}>
+    <Container sx={{ mt: 4 }}>
+      <ToastContainer />
       <Typography variant="h4" gutterBottom>📝 My Tasks</Typography>
 
-      {/* Create Task Form */}
-      <Box component="form" onSubmit={handleCreate} sx={{ mb: 4 }}>
-        <TextField fullWidth label="Title" margin="normal"
-          value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-        <TextField fullWidth label="Description" margin="normal" multiline rows={2}
-          value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-        <TextField type="date" label="Due Date" fullWidth margin="normal"
-          InputLabelProps={{ shrink: true }}
-          value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
-        <Stack direction="row" spacing={2} mt={2}>
-          <TextField select fullWidth label="Priority" value={form.priority}
-            onChange={(e) => setForm({ ...form, priority: e.target.value })}>
+      <Box component="form" onSubmit={handleCreate} mb={3}>
+        <TextField label="Title" fullWidth margin="normal" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        <TextField label="Description" fullWidth margin="normal" multiline rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+        <Stack direction="row" spacing={2}>
+          <TextField select label="Priority" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} fullWidth>
             <MenuItem value="Low">Low</MenuItem>
             <MenuItem value="Medium">Medium</MenuItem>
             <MenuItem value="High">High</MenuItem>
           </TextField>
-          <TextField select fullWidth label="Status" value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value })}>
+          <TextField select label="Status" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} fullWidth>
             <MenuItem value="Pending">Pending</MenuItem>
             <MenuItem value="Complete">Complete</MenuItem>
           </TextField>
         </Stack>
-        <Button type="submit" fullWidth variant="contained" sx={{ mt: 2 }}>+ Add Task</Button>
+        <TextField
+          type="date"
+          label="Due Date"
+          margin="normal"
+          fullWidth
+          InputLabelProps={{ shrink: true }}
+          value={form.dueDate}
+          onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+        />
+        <TextField
+          type="file"
+          fullWidth
+          inputProps={{ accept: '.jpg,.jpeg,.png,.pdf,.docx' }}
+          onChange={(e) => setForm({ ...form, file: e.target.files[0] })}
+        />
+        <Button type="submit" variant="contained" fullWidth sx={{ mt: 2 }}>+ Add Task</Button>
       </Box>
 
-      {/* Filters */}
       <Stack direction="row" spacing={2} mb={3}>
-        <TextField fullWidth placeholder="Search tasks..." value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
-        />
-        <TextField select label="Priority" value={priorityFilter}
-          onChange={(e) => setPriorityFilter(e.target.value)} sx={{ minWidth: 140 }}>
+        <TextField label="Search" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value, page: 1 })} fullWidth />
+        <TextField select label="Priority" value={filters.priority} onChange={(e) => setFilters({ ...filters, priority: e.target.value, page: 1 })}>
           <MenuItem value="">All</MenuItem>
           <MenuItem value="Low">Low</MenuItem>
           <MenuItem value="Medium">Medium</MenuItem>
           <MenuItem value="High">High</MenuItem>
         </TextField>
-        <TextField select label="Status" value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)} sx={{ minWidth: 140 }}>
+        <TextField select label="Status" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value, page: 1 })}>
           <MenuItem value="">All</MenuItem>
           <MenuItem value="Pending">Pending</MenuItem>
           <MenuItem value="Complete">Complete</MenuItem>
         </TextField>
       </Stack>
 
-      {/* Task List */}
-      {loading ? (
-        <Typography>Loading...</Typography>
-      ) : tasks.length === 0 ? (
-        <Typography align="center">No tasks found.</Typography>
-      ) : (
-        <Stack spacing={2}>
-          {tasks.map(task => (
-            <Card key={task._id}>
+      <Grid container spacing={2}>
+        {tasks.map(task => (
+          <Grid item xs={12} md={6} key={task._id}>
+            <Card sx={{ backgroundColor: task.status === 'Complete' ? '#e8f5e9' : '#fff' }}>
               <CardContent>
-                <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="h6" fontWeight="bold">{task.title}</Typography>
-                  <Stack direction="row" spacing={1}>
-                    <Chip label={task.priority} color={getColor('priority', task.priority)} />
-                    <Chip label={task.status} color={getColor('status', task.status)} />
-                  </Stack>
-                </Stack>
-                <Typography variant="body2" sx={{ fontStyle: 'italic', mt: 1 }}>{task.description}</Typography>
-                <Typography variant="caption">Due: {task.dueDate?.split('T')[0] || '—'}</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>{task.title}</Typography>
+                <Typography variant="body2" color="textSecondary">{task.description}</Typography>
+                <Typography variant="caption">📅 Due: {task.dueDate?.slice(0, 10) || 'N/A'}</Typography><br />
+                <Typography variant="caption">🚦 Priority: {task.priority}</Typography><br />
+                <Typography variant="caption">📌 Status: {task.status}</Typography>
+                {task.file && (
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1 }}>
+                    📎 <a href={`http://localhost:5000/uploads/${task.file}`} target="_blank" rel="noreferrer">View File</a>
+                  </Typography>
+                )}
                 <Stack direction="row" spacing={1} mt={2}>
-                  <IconButton onClick={() => handleEditOpen(task)}><EditIcon /></IconButton>
-                  <IconButton color="error" onClick={() => dispatch(deleteTask(task._id))}><DeleteIcon /></IconButton>
+                  <IconButton onClick={() => handleEdit(task)}><EditIcon /></IconButton>
+                  <IconButton color="error" onClick={() => handleDelete(task._id)}><DeleteIcon /></IconButton>
+                  <Button size="small" onClick={() => handleToggleStatus(task._id)}>
+                    Mark {task.status === 'Complete' ? 'Pending' : 'Complete'}
+                  </Button>
                 </Stack>
               </CardContent>
             </Card>
-          ))}
-        </Stack>
-      )}
+          </Grid>
+        ))}
+      </Grid>
 
-      {/* Pagination */}
-      <Stack direction="row" spacing={2} justifyContent="center" mt={4}>
-        <Button onClick={() => setPage((p) => Math.max(p - 1, 1))} disabled={page === 1}>
-          Prev
-        </Button>
-        <Typography sx={{ pt: 1 }}>Page {page}</Typography>
-        <Button onClick={() => setPage((p) => p + 1)} disabled={tasks.length < limit}>
-          Next
-        </Button>
+      <Stack direction="row" justifyContent="center" mt={4} spacing={2}>
+        <Button disabled={filters.page <= 1} onClick={() => setFilters({ ...filters, page: filters.page - 1 })}>Previous</Button>
+        <Typography>Page {filters.page}</Typography>
+        <Button disabled={(filters.page * 5) >= total} onClick={() => setFilters({ ...filters, page: filters.page + 1 })}>Next</Button>
       </Stack>
 
-      {/* Edit Modal */}
       <Dialog open={editOpen} onClose={() => setEditOpen(false)}>
         <DialogTitle>Edit Task</DialogTitle>
         <DialogContent>
-          <TextField fullWidth label="Title" margin="normal" value={editForm.title}
-            onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
-          <TextField fullWidth label="Description" margin="normal" multiline rows={2}
-            value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
-          <TextField type="date" label="Due Date" fullWidth margin="normal"
-            InputLabelProps={{ shrink: true }}
-            value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} />
-          <TextField select fullWidth label="Priority" margin="normal" value={editForm.priority}
-            onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })}>
+          <TextField label="Title" fullWidth margin="normal" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          <TextField label="Description" fullWidth margin="normal" multiline rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          <TextField select label="Priority" fullWidth margin="normal" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
             <MenuItem value="Low">Low</MenuItem>
             <MenuItem value="Medium">Medium</MenuItem>
             <MenuItem value="High">High</MenuItem>
           </TextField>
-          <TextField select fullWidth label="Status" margin="normal" value={editForm.status}
-            onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
+          <TextField select label="Status" fullWidth margin="normal" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
             <MenuItem value="Pending">Pending</MenuItem>
             <MenuItem value="Complete">Complete</MenuItem>
           </TextField>
+          <TextField
+            type="date"
+            label="Due Date"
+            margin="normal"
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+            value={form.dueDate}
+            onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditOpen(false)}>Cancel</Button>
