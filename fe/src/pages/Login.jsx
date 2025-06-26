@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Container, TextField, Button, Typography, Box, Avatar, Paper
+} from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
 import { loginUser } from '../features/auth/authSlice';
 import { useNavigate, Link } from 'react-router-dom';
-import { Container, TextField, Button, Typography, Box } from '@mui/material';
 
 const Login = () => {
   const dispatch = useDispatch();
@@ -29,24 +31,52 @@ const Login = () => {
 
   return (
     <Container maxWidth="xs">
-      <Box sx={{ mt: 8 }}>
-        <Typography variant="h5" gutterBottom>Login</Typography>
-        {formError && <Typography color="error">{formError}</Typography>}
+      <Paper elevation={4} sx={{ p: 4, mt: 8, borderRadius: 3 }}>
+        <Box display="flex" justifyContent="center" mb={2}>
+          <Avatar
+            src="/logo.png"
+            alt="Taskify Logo"
+            sx={{ width: 64, height: 64, bgcolor: '#fff', p: 1, boxShadow: 2 }}
+          />
+        </Box>
+        <Typography variant="h5" align="center" fontWeight={600} gutterBottom>
+          Welcome to Taskify
+        </Typography>
+
+        {formError && (
+          <Typography color="error" align="center" sx={{ mt: 1 }}>
+            {formError}
+          </Typography>
+        )}
+
         <form onSubmit={handleSubmit}>
           <TextField
             fullWidth label="Email" margin="normal"
-            value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
           />
           <TextField
             fullWidth label="Password" type="password" margin="normal"
-            value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
           />
-          <Button fullWidth type="submit" variant="contained" sx={{ mt: 2 }}>Login</Button>
+          <Button
+            fullWidth
+            type="submit"
+            variant="contained"
+            sx={{ mt: 2, py: 1.2 }}
+          >
+            Login
+          </Button>
         </form>
-        <Typography variant="body2" sx={{ mt: 2 }}>
-          Don't have an account? <Link to="/register">Register</Link>
+
+        <Typography variant="body2" align="center" sx={{ mt: 3 }}>
+          Don't have an account?{' '}
+          <Link to="/register" style={{ textDecoration: 'none', color: '#1976d2' }}>
+            Register
+          </Link>
         </Typography>
-      </Box>
+      </Paper>
     </Container>
   );
 };
