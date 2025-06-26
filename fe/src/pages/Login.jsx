@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Container, TextField, Button, Typography, Box, Avatar, Paper
+  Container, TextField, Button, Typography, Box, Avatar, Paper, InputAdornment, IconButton
 } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
 import { loginUser } from '../features/auth/authSlice';
 import { useNavigate, Link } from 'react-router-dom';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { token, user, loading, error } = useSelector(state => state.auth);
+  const { token } = useSelector(state => state.auth);
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [formError, setFormError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,57 +26,43 @@ const Login = () => {
   };
 
   useEffect(() => {
-    if (token) {
-      navigate('/dashboard');
-    }
-  }, [token, navigate]);
+    if (token) navigate('/dashboard');
+  }, [token]);
 
   return (
     <Container maxWidth="xs">
       <Paper elevation={4} sx={{ p: 4, mt: 8, borderRadius: 3 }}>
         <Box display="flex" justifyContent="center" mb={2}>
-          <Avatar
-            src="/logo.png"
-            alt="Taskify Logo"
-            sx={{ width: 64, height: 64, bgcolor: '#fff', p: 1, boxShadow: 2 }}
-          />
+          <Avatar src="/logo.png" sx={{ width: 64, height: 64, bgcolor: '#fff', p: 1 }} />
         </Box>
-        <Typography variant="h5" align="center" fontWeight={600} gutterBottom>
-          Welcome to Taskify
-        </Typography>
 
-        {formError && (
-          <Typography color="error" align="center" sx={{ mt: 1 }}>
-            {formError}
-          </Typography>
-        )}
+        <Typography variant="h5" align="center" gutterBottom>Login to Taskify</Typography>
+        {formError && <Typography color="error" align="center">{formError}</Typography>}
 
         <form onSubmit={handleSubmit}>
+          <TextField fullWidth label="Email" margin="normal" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <TextField
-            fullWidth label="Email" margin="normal"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
-          <TextField
-            fullWidth label="Password" type="password" margin="normal"
+            fullWidth
+            label="Password"
+            type={showPassword ? 'text' : 'password'}
+            margin="normal"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
           />
-          <Button
-            fullWidth
-            type="submit"
-            variant="contained"
-            sx={{ mt: 2, py: 1.2 }}
-          >
-            Login
-          </Button>
+          <Button fullWidth type="submit" variant="contained" sx={{ mt: 2 }}>Login</Button>
         </form>
 
-        <Typography variant="body2" align="center" sx={{ mt: 3 }}>
-          Don't have an account?{' '}
-          <Link to="/register" style={{ textDecoration: 'none', color: '#1976d2' }}>
-            Register
-          </Link>
+        <Typography variant="body2" align="center" sx={{ mt: 2 }}>
+          Don’t have an account? <Link to="/register">Register</Link>
         </Typography>
       </Paper>
     </Container>

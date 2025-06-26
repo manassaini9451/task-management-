@@ -50,6 +50,10 @@ const Navbar = () => {
           <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
             Hi, {user?.name || 'User'}
           </Typography>
+          <Button color="inherit" onClick={() => navigate('/profile')}>
+  Profile
+</Button>
+
           <Button
             sx={{
               backgroundColor: '#fff',

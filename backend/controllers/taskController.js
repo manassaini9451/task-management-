@@ -1,30 +1,25 @@
 const Task = require('../models/Task');
 
 exports.getTasks = async (req, res) => {
-  const { page = 1, limit = 5, search = '', priority, status } = req.query;
+  const { search = '', status, priority } = req.query;
 
   const query = {
     user: req.user._id,
     $or: [
-      { title: new RegExp(search, 'i') },
-      { description: new RegExp(search, 'i') }
-    ]
+      { title: { $regex: search, $options: 'i' } },
+      { description: { $regex: search, $options: 'i' } },
+    ],
   };
-  if (priority) query.priority = priority;
+
   if (status) query.status = status;
+  if (priority) query.priority = priority;
 
-  const tasks = await Task.find(query)
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(parseInt(limit));
-
-  const total = await Task.countDocuments(query);
-
-  res.json({ tasks, total });
+  const tasks = await Task.find(query).sort({ createdAt: -1 });
+  res.json(tasks);
 };
 
 exports.createTask = async (req, res) => {
-  const { title, description, dueDate, priority, status } = req.body;
+  const { title, description, priority, status, dueDate } = req.body;
 
   if (!title || !description) {
     return res.status(400).json({ message: 'Title and description are required' });
@@ -33,11 +28,10 @@ exports.createTask = async (req, res) => {
   const task = await Task.create({
     title,
     description,
-    dueDate,
     priority,
     status,
-    file: req.file?.filename || null,
-    user: req.user._id
+    dueDate,
+    user: req.user._id,
   });
 
   res.status(201).json(task);
@@ -49,6 +43,7 @@ exports.updateTask = async (req, res) => {
     req.body,
     { new: true }
   );
+
   if (!task) return res.status(404).json({ message: 'Task not found' });
   res.json(task);
 };
@@ -63,8 +58,7 @@ exports.toggleTaskStatus = async (req, res) => {
   const task = await Task.findOne({ _id: req.params.id, user: req.user._id });
   if (!task) return res.status(404).json({ message: 'Task not found' });
 
-  task.status = task.status === 'Complete' ? 'Pending' : 'Complete';
+  task.status = task.status === 'Pending' ? 'Complete' : 'Pending';
   await task.save();
-
   res.json(task);
 };
